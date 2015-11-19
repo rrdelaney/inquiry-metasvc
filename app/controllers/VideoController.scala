@@ -25,7 +25,7 @@ class VideoController @Inject() (videoDAO: VideoDAO, system: ActorSystem, ws: WS
   implicit val timeout = akka.util.Timeout(500000 seconds)
 
   def process(id: String) = Action {
-    val framesFuture: Future[Long] = ws.url(s"localhost:8000/fetch/$id").get().map { response =>
+    val framesFuture: Future[Long] = ws.url(s"http://localhost:8000/fetch/$id").get().map { response =>
       (response.json \ "num_frames").as[Long]
     }
     val frames = Await.result(framesFuture, Duration.Inf)
