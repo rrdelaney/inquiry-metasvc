@@ -14,7 +14,7 @@ libraryDependencies ++= Seq(
 )
 
 seq(flywaySettings: _*)
-flywayUrl := "jdbc:postgresql://localhost:15432/inquiry_db"
+flywayUrl := "jdbc:postgresql://localhost:5432/inquiry_db"
 flywayUser := "inquiry"
 flywayPassword := "inquiry"
 flywayLocations := Seq("filesystem:./migrations")
