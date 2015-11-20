@@ -42,14 +42,21 @@ class VideoController @Inject() (videoDAO: VideoDAO, metadataDAO: VideoMetadataD
 
     val token: String = Await.result(tokenFuture, Duration.Inf)
 
+    println(token)
+
     val url = s"https://api.clarifai.com/v1/tag/?url=http://104.236.166.190/frames/$id/$frame.jpg"
-    val keywords: Future[Seq[JsValue]] = ws.url(url)
+
+    println(url)
+    
+    val keywordsFuture: Future[Seq[JsValue]] = ws.url(url)
       .withHeaders("Authorization" -> s"Bearer $token")
       .get()
       .map { response =>
         (response.json \\ "classes")
       }
 
+    val keywords = Await.result(keywordsFuture, Duration.Inf)
+    println(keywords)
     Ok("HI")
   }
 
