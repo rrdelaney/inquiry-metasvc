@@ -24,6 +24,10 @@ import play.api.libs.json.JsValue
 
 import scala.util.{Left, Right}
 
+import scala.io.Source
+
+import actors.util.SRTParser._
+
 @Singleton
 class VideoController @Inject() (corsFilter: CORSFilter, videoDAO: VideoDAO, metadataDAO: VideoMetadataDAO, system: ActorSystem, ws: WSClient) extends Controller {
   def filters = Seq(corsFilter)
@@ -45,30 +49,50 @@ class VideoController @Inject() (corsFilter: CORSFilter, videoDAO: VideoDAO, met
 
     metadataDAO.insert(VideoMetadata(id, total_frames, duration))
 
-    // Process Tesseract Data
-    val tessProcs = (1 to frames.toInt).map(frame => (tesseractProcessors ? ProcessImage(id, frame.toString)).mapTo[Boolean])
+    // // Process Tesseract Data
+    // val tessProcs = (1 to frames.toInt).map(frame => (tesseractProcessors ? ProcessImage(id, frame.toString)).mapTo[Boolean])
+    //
+    // // Get Clarifai OAuth2 Token
+    // val tokenFuture: Future[String] =
+    //   ws.url("https://api.clarifai.com/v1/token/")
+    //     .post(Map(
+    //       "grant_type" -> Seq("client_credentials"),
+    //       "client_id" -> Seq("vxgYA0F1qWmZQktMmKMhppqIQss4zMYDmxQX3kbD"),
+    //       "client_secret" -> Seq("ipFs34CvymKN8sXYHH3Rph1G7QIELIXwhFR4b8eq")
+    //     ))
+    //     .map { response =>
+    //       (response.json \ "access_token").as[String]
+    //     }
+    //
+    // val token: String = Await.result(tokenFuture, Duration.Inf)
+    //
+    // val clarifaiProcs = (1 to frames.toInt).map(frame => (clarifaiProcessors ? ClarifaiImage(id, frame.toString, token)).mapTo[Boolean])
+    // // val captionProc = (captionProcessors ? ProcessCaption(id)).mapTo[Boolean]
 
-    // Get Clarifai OAuth2 Token
-    val tokenFuture: Future[String] =
-      ws.url("https://api.clarifai.com/v1/token/")
-        .post(Map(
-          "grant_type" -> Seq("client_credentials"),
-          "client_id" -> Seq("vxgYA0F1qWmZQktMmKMhppqIQss4zMYDmxQX3kbD"),
-          "client_secret" -> Seq("ipFs34CvymKN8sXYHH3Rph1G7QIELIXwhFR4b8eq")
-        ))
-        .map { response =>
-          (response.json \ "access_token").as[String]
+    // Parse caption data
+    val captionFuture: Future[JsValue] = ws.url(s"http://localhost:8000/captions/$id").get().map { response =>
+      response.json
+    }
+    val captionData = Await.result(captionFuture, Duration.Inf)
+    val downloaded = (captionData \ "downloaded").as[Boolean]
+
+    downloaded match {
+      case true =>
+        val text = Source.fromFile(s"/var/www/captions/$id.en.srt").mkString
+        val captions: List[Caption] = parseSRT(text)
+        captions.map { caption =>
+          videoDAO.updateCaption(id, caption.getFrame(total_frames, duration), caption.content)
         }
+      case false => None
+    }
 
-    val token: String = Await.result(tokenFuture, Duration.Inf)
 
-    val clarifaiProcs = (1 to frames.toInt).map(frame => (clarifaiProcessors ? ClarifaiImage(id, frame.toString, token)).mapTo[Boolean])
-    // val captionProc = (captionProcessors ? ProcessCaption(id)).mapTo[Boolean]
 
-    Await.result(Future.sequence(tessProcs), Duration.Inf)
-    Await.result(Future.sequence(clarifaiProcs), Duration.Inf)
+    //Await.result(Future.sequence(tessProcs), Duration.Inf)
+    //Await.result(Future.sequence(clarifaiProcs), Duration.Inf)
     Ok("Sent Messages Bruh")
   }
+
 
   def exists(id: String) = Action.async {
     videoDAO.exists(id).map{
