@@ -2,7 +2,7 @@ package dao
 
 import javax.inject.{Singleton, Inject}
 import scala.concurrent.Future
-import models.Video
+import models._
 import play.api.db.slick.HasDatabaseConfig
 import play.api.libs.concurrent.Execution.Implicits.defaultContext
 import slick.driver.JdbcProfile
@@ -29,6 +29,22 @@ class VideoDAO extends GenericDAO with VideoComponent {
   import driver.api._
 
   val videos = TableQuery[Videos]
+
+  def fetch(metadata: VideoMetadata, query: String): Future[Seq[Long]] = {
+    val id = metadata.id
+    val frames = metadata.frames
+    val duration = metadata.duration
+    val keywords = s"%$query%"
+    val action = sql"""SELECT FLOOR(frame * 24 * $duration::numeric::integer / $frames::numeric::integer) AS frames
+                       FROM inq_video_metadata
+                       WHERE id = $id
+                       AND image_data LIKE $keywords""".as[Long]
+
+    db.run(action.asTry).map {
+      case Success(data: Seq[Long]) => data
+      case Failure(data) => Seq.empty[Long]
+    }
+  }
 
   def exists(id: String): Future[Boolean] = {
     val action = videos.filter(_.id === id).length

@@ -7,7 +7,7 @@ import play.api.db.slick.HasDatabaseConfig
 import play.api.libs.concurrent.Execution.Implicits.defaultContext
 import slick.driver.JdbcProfile
 
-import scala.util.{Left, Right, Success, Failure}
+import scala.util.{Either, Left, Right, Success, Failure}
 
 import org.postgresql.util.PSQLException
 
@@ -27,6 +27,19 @@ class VideoMetadataDAO extends GenericDAO with VideoMetadataComponent {
   import driver.api._
 
   val videos = TableQuery[VideoMetadatas]
+
+  def fetch(id: String): Future[Either[VideoMetadata, String]] = {
+    val action = for {
+      v <- videos if v.id === id
+    } yield v
+
+    db.run(action.result).map { result =>
+      result.headOption match {
+        case Some(v: VideoMetadata) => Left(v)
+        case _ => Right("Invalid ID")
+      }
+    }
+  }
 
   def insert(metadata: VideoMetadata): Future[Boolean] = {
     val action = (videos returning videos.map(_.id)) += metadata

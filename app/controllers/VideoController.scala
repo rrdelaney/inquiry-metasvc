@@ -17,8 +17,10 @@ import actors.ImageProcessingActor._
 import actors.CaptionProcessingActor._
 
 import scala.collection.mutable.ListBuffer
-
+import play.api.libs.json.Json
 import play.api.libs.json.JsValue
+
+import scala.util.{Left, Right}
 
 @Singleton
 class VideoController @Inject() (videoDAO: VideoDAO, metadataDAO: VideoMetadataDAO, system: ActorSystem, ws: WSClient) extends Controller {
@@ -27,33 +29,6 @@ class VideoController @Inject() (videoDAO: VideoDAO, metadataDAO: VideoMetadataD
   // val captionProcessors = system.actorOf(Props(new CaptionProcessingActor(videoDAO)), "caption-processor")
 
   implicit val timeout = akka.util.Timeout(500000 seconds)
-
-  def testClarifai(id: String, frame: String) = Action {
-    val tokenFuture: Future[String] =
-      ws.url("https://api.clarifai.com/v1/token/")
-        .post(Map(
-          "grant_type" -> Seq("client_credentials"),
-          "client_id" -> Seq("vxgYA0F1qWmZQktMmKMhppqIQss4zMYDmxQX3kbD"),
-          "client_secret" -> Seq("ipFs34CvymKN8sXYHH3Rph1G7QIELIXwhFR4b8eq")
-        ))
-        .map { response =>
-          (response.json \ "access_token").as[String]
-        }
-
-    val token: String = Await.result(tokenFuture, Duration.Inf)
-
-    val url = s"https://api.clarifai.com/v1/tag/?url=http://104.236.166.190/frames/$id/$frame.jpg"
-    val keywordsFuture: Future[Seq[JsValue]] = ws.url(url)
-      .withHeaders("Authorization" -> s"Bearer $token")
-      .get()
-      .map { response =>
-        (response.json \\ "classes")
-      }
-
-    val keywords = Await.result(keywordsFuture, Duration.Inf)
-    val data = keywords(0).as[List[String]] mkString (" ")
-    Ok("HI")
-  }
 
   def process(id: String) = Action {
     val fetchFuture: Future[JsValue] = ws.url(s"http://localhost:8000/fetch/$id").get().map { response =>
@@ -95,6 +70,16 @@ class VideoController @Inject() (videoDAO: VideoDAO, metadataDAO: VideoMetadataD
     videoDAO.exists(id).map{
       case true => Ok("Video Exists")
       case false => BadRequest("Video Does Not Exist")
+    }
+  }
+
+  def query(id: String, query: String) = Action.async {
+    metadataDAO.fetch(id).map {
+      case Left(metadata: VideoMetadata) =>
+        val resultFuture = videoDAO.fetch(metadata, query)
+        val result = Await.result(resultFuture, Duration.Inf)
+        Ok(Json.toJson(result))
+      case Right(err) => BadRequest(err)
     }
   }
 
