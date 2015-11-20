@@ -39,15 +39,15 @@ class VideoController @Inject() (corsFilter: CORSFilter, videoDAO: VideoDAO, met
   implicit val timeout = akka.util.Timeout(500000 seconds)
 
   def process(id: String) = Action {
-    // val fetchFuture: Future[JsValue] = ws.url(s"http://localhost:8000/fetch/$id").get().map { response =>
-    //   response.json
-    // }
-    // val fetchData = Await.result(fetchFuture, Duration.Inf)
-    // val frames = (fetchData \ "num_frames").as[Long]
-    // val total_frames = (fetchData \ "total_frames").as[Long]
-    // val duration = (fetchData \ "duration").as[Int]
-    //
-    // metadataDAO.insert(VideoMetadata(id, total_frames, duration))
+    val fetchFuture: Future[JsValue] = ws.url(s"http://localhost:8000/fetch/$id").get().map { response =>
+      response.json
+    }
+    val fetchData = Await.result(fetchFuture, Duration.Inf)
+    val frames = (fetchData \ "num_frames").as[Long]
+    val total_frames = (fetchData \ "total_frames").as[Long]
+    val duration = (fetchData \ "duration").as[Int]
+
+    metadataDAO.insert(VideoMetadata(id, total_frames, duration))
 
     // // Process Tesseract Data
     // val tessProcs = (1 to frames.toInt).map(frame => (tesseractProcessors ? ProcessImage(id, frame.toString)).mapTo[Boolean])
