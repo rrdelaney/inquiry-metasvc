@@ -2,8 +2,9 @@ package actors.processors
 
 import akka.actor._
 import play.api.libs.ws._
-import scala.concurrent.Future
-
+import scala.concurrent.{Future, Await}
+import scala.concurrent.duration._
+import play.api.libs.json.JsValue
 import dao.VideoDAO
 
 import play.api.libs.concurrent.Execution.Implicits.defaultContext
@@ -13,13 +14,20 @@ class ClarifaiProcessingActor(ws: WSClient, videoDAO: VideoDAO) extends Actor {
 
   def receive = {
     case ClarifaiImage(id: String, frame: String, token: String) =>
+      println(s"Processing video id: $id on frame $frame with token: $token")
       val url = s"https://api.clarifai.com/v1/tag/?url=http://104.236.166.190/frames/$id/$frame.jpg"
-      val keywords = ws.url(url)
+      val keywordsFuture: Future[Seq[JsValue]] = ws.url(url)
         .withHeaders("Authorization" -> s"Bearer $token")
         .get()
         .map { response =>
           (response.json \\ "classes")
         }
-      sender() ! true
+
+      val keywords = Await.result(keywordsFuture, Duration.Inf)
+      val data = keywords(0).as[List[String]] mkString (" ")
+
+      val result = videoDAO.updateImageData(id, frame.toLong, data).map { result =>
+        sender() ! result
+      }
   }
 }

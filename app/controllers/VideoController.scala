@@ -51,7 +51,7 @@ class VideoController @Inject() (videoDAO: VideoDAO, metadataDAO: VideoMetadataD
       }
 
     val keywords = Await.result(keywordsFuture, Duration.Inf)
-    println(keywords(0).as[List[String]])
+    val data = keywords(0).as[List[String]] mkString (" ")
     Ok("HI")
   }
 
