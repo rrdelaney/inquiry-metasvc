@@ -16,7 +16,6 @@ import scala.concurrent.duration._
 import akka.pattern.ask
 import actors.processors._
 import actors.ImageProcessingActor._
-import actors.CaptionProcessingActor._
 
 import scala.collection.mutable.ListBuffer
 import play.api.libs.json.Json
@@ -34,7 +33,6 @@ class VideoController @Inject() (corsFilter: CORSFilter, videoDAO: VideoDAO, met
 
   val tesseractProcessors = system.actorOf(Props(new TesseractProcessingActor(videoDAO)), "tesseract-processor")
   val clarifaiProcessors = system.actorOf(Props(new ClarifaiProcessingActor(ws, videoDAO)), "clarifai-processor")
-  // val captionProcessors = system.actorOf(Props(new CaptionProcessingActor(videoDAO)), "caption-processor")
 
   implicit val timeout = akka.util.Timeout(500000 seconds)
 
@@ -49,25 +47,24 @@ class VideoController @Inject() (corsFilter: CORSFilter, videoDAO: VideoDAO, met
 
     metadataDAO.insert(VideoMetadata(id, total_frames, duration))
 
-    // // Process Tesseract Data
-    // val tessProcs = (1 to frames.toInt).map(frame => (tesseractProcessors ? ProcessImage(id, frame.toString)).mapTo[Boolean])
-    //
-    // // Get Clarifai OAuth2 Token
-    // val tokenFuture: Future[String] =
-    //   ws.url("https://api.clarifai.com/v1/token/")
-    //     .post(Map(
-    //       "grant_type" -> Seq("client_credentials"),
-    //       "client_id" -> Seq("vxgYA0F1qWmZQktMmKMhppqIQss4zMYDmxQX3kbD"),
-    //       "client_secret" -> Seq("ipFs34CvymKN8sXYHH3Rph1G7QIELIXwhFR4b8eq")
-    //     ))
-    //     .map { response =>
-    //       (response.json \ "access_token").as[String]
-    //     }
-    //
-    // val token: String = Await.result(tokenFuture, Duration.Inf)
-    //
-    // val clarifaiProcs = (1 to frames.toInt).map(frame => (clarifaiProcessors ? ClarifaiImage(id, frame.toString, token)).mapTo[Boolean])
-    // // val captionProc = (captionProcessors ? ProcessCaption(id)).mapTo[Boolean]
+    // Process Tesseract Data
+    val tessProcs = (1 to frames.toInt).map(frame => (tesseractProcessors ? ProcessImage(id, frame.toString)).mapTo[Boolean])
+
+    // Get Clarifai OAuth2 Token
+    val tokenFuture: Future[String] =
+      ws.url("https://api.clarifai.com/v1/token/")
+        .post(Map(
+          "grant_type" -> Seq("client_credentials"),
+          "client_id" -> Seq("vxgYA0F1qWmZQktMmKMhppqIQss4zMYDmxQX3kbD"),
+          "client_secret" -> Seq("ipFs34CvymKN8sXYHH3Rph1G7QIELIXwhFR4b8eq")
+        ))
+        .map { response =>
+          (response.json \ "access_token").as[String]
+        }
+
+    val token: String = Await.result(tokenFuture, Duration.Inf)
+
+    val clarifaiProcs = (1 to frames.toInt).map(frame => (clarifaiProcessors ? ClarifaiImage(id, frame.toString, token)).mapTo[Boolean])
 
     // Parse caption data
     val captionFuture: Future[JsValue] = ws.url(s"http://localhost:8000/captions/$id").get().map { response =>
@@ -81,15 +78,13 @@ class VideoController @Inject() (corsFilter: CORSFilter, videoDAO: VideoDAO, met
         val text = Source.fromFile(s"/var/www/captions/$id.en.srt").mkString
         val captions: List[Caption] = parseSRT(text)
         captions.par.map { caption =>
-          videoDAO.updateCaption(id, caption.getFrame(total_frames, duration), caption.content)
+          videoDAO.updateCaption(id, caption.getFrame(total_frames, duration), caption.content.toLowerCase())
         }
       case false => None
     }
 
-
-
-    //Await.result(Future.sequence(tessProcs), Duration.Inf)
-    //Await.result(Future.sequence(clarifaiProcs), Duration.Inf)
+    Await.result(Future.sequence(tessProcs), Duration.Inf)
+    Await.result(Future.sequence(clarifaiProcs), Duration.Inf)
     Ok("Sent Messages Bruh")
   }
 
