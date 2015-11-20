@@ -8,6 +8,8 @@ import play.api.libs.concurrent.Execution.Implicits.defaultContext
 import scala.concurrent.{Future, Await}
 
 import models.VideoMetadata
+import play.api.http.HttpFilters
+import play.filters.cors.CORSFilter
 
 import akka.actor._
 import scala.concurrent.duration._
@@ -23,7 +25,9 @@ import play.api.libs.json.JsValue
 import scala.util.{Left, Right}
 
 @Singleton
-class VideoController @Inject() (videoDAO: VideoDAO, metadataDAO: VideoMetadataDAO, system: ActorSystem, ws: WSClient) extends Controller {
+class VideoController @Inject() (corsFilter: CORSFilter, videoDAO: VideoDAO, metadataDAO: VideoMetadataDAO, system: ActorSystem, ws: WSClient) extends Controller {
+  def filters = Seq(corsFilter)
+
   val tesseractProcessors = system.actorOf(Props(new TesseractProcessingActor(videoDAO)), "tesseract-processor")
   val clarifaiProcessors = system.actorOf(Props(new ClarifaiProcessingActor(ws, videoDAO)), "clarifai-processor")
   // val captionProcessors = system.actorOf(Props(new CaptionProcessingActor(videoDAO)), "caption-processor")

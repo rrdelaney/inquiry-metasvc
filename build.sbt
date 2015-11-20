@@ -9,6 +9,7 @@ libraryDependencies ++= Seq(
   cache,
   ws,
   specs2 % Test,
+  filters,
   "org.postgresql" % "postgresql" % "9.4-1204-jdbc4",
   "com.typesafe.play" %% "play-slick" % "1.1.0"
 )
