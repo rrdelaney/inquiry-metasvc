@@ -3,9 +3,11 @@ package controllers
 import play.api.mvc._
 import play.api.libs.ws._
 import javax.inject._
-import dao.VideoDAO
+import dao._
 import play.api.libs.concurrent.Execution.Implicits.defaultContext
 import scala.concurrent.{Future, Await}
+
+import models.VideoMetadata
 
 import akka.actor._
 import scala.concurrent.duration._
@@ -16,8 +18,10 @@ import actors.CaptionProcessingActor._
 
 import scala.collection.mutable.ListBuffer
 
+import play.api.libs.json.JsValue
+
 @Singleton
-class VideoController @Inject() (videoDAO: VideoDAO, system: ActorSystem, ws: WSClient) extends Controller {
+class VideoController @Inject() (videoDAO: VideoDAO, metadataDAO: VideoMetadataDAO, system: ActorSystem, ws: WSClient) extends Controller {
   val tesseractProcessors = system.actorOf(Props(new TesseractProcessingActor(videoDAO)), "tesseract-processor")
   val clarifaiProcessors = system.actorOf(Props(new ClarifaiProcessingActor(ws, videoDAO)), "clarifai-processor")
   // val captionProcessors = system.actorOf(Props(new CaptionProcessingActor(videoDAO)), "caption-processor")
@@ -25,10 +29,15 @@ class VideoController @Inject() (videoDAO: VideoDAO, system: ActorSystem, ws: WS
   implicit val timeout = akka.util.Timeout(500000 seconds)
 
   def process(id: String) = Action {
-    val framesFuture: Future[Long] = ws.url(s"http://localhost:8000/fetch/$id").get().map { response =>
-      (response.json \ "num_frames").as[Long]
+    val fetchFuture: Future[JsValue] = ws.url(s"http://localhost:8000/fetch/$id").get().map { response =>
+      response.json
     }
-    val frames = Await.result(framesFuture, Duration.Inf)
+    val fetchData = Await.result(fetchFuture, Duration.Inf)
+    val frames = (fetchData \ "num_frames").as[Long]
+    val total_frames = (fetchData \ "total_frames").as[Long]
+    val duration = (fetchData \ "duration").as[Int]
+
+    metadataDAO.insert(VideoMetadata(id, total_frames, duration))
 
     // Process Tesseract Data
     val tessProcs = (1 to frames.toInt).map(frame => (tesseractProcessors ? ProcessImage(id, frame.toString)).mapTo[Boolean])

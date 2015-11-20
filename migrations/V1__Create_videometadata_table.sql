@@ -1,12 +1,10 @@
 -- Create user schema
-CREATE TABLE inq_video_metadata (
+CREATE TABLE inq_youtube_metadata (
     id varchar(64) NOT NULL,
-    frame bigint NOT NULL,
-    caption varchar(2048),
-    ocr_data varchar(2048),
-    image_data varchar(2048),
-    PRIMARY KEY(id, frame)
+    frames bigint NOT NULL,
+    duration integer NOT NULL,
+    PRIMARY KEY(id)
 );
 
 -- Index on video ID for fast querying
-CREATE INDEX ON inq_video_metadata (id);
+CREATE INDEX ON inq_youtube_metadata (id);
