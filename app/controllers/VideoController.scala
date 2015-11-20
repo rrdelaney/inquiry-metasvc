@@ -28,6 +28,31 @@ class VideoController @Inject() (videoDAO: VideoDAO, metadataDAO: VideoMetadataD
 
   implicit val timeout = akka.util.Timeout(500000 seconds)
 
+  def testClarifai(id: String, frame: String) = Action {
+    val tokenFuture: Future[String] =
+      ws.url("https://api.clarifai.com/v1/token/")
+        .post(Map(
+          "grant_type" -> Seq("client_credentials"),
+          "client_id" -> Seq("vxgYA0F1qWmZQktMmKMhppqIQss4zMYDmxQX3kbD"),
+          "client_secret" -> Seq("ipFs34CvymKN8sXYHH3Rph1G7QIELIXwhFR4b8eq")
+        ))
+        .map { response =>
+          (response.json \ "access_token").as[String]
+        }
+
+    val token: String = Await.result(tokenFuture, Duration.Inf)
+
+    val url = s"https://api.clarifai.com/v1/tag/?url=http://104.236.166.190/frames/$id/$frame.jpg"
+    val keywords: Future[Seq[JsValue]] = ws.url(url)
+      .withHeaders("Authorization" -> s"Bearer $token")
+      .get()
+      .map { response =>
+        (response.json \\ "classes")
+      }
+
+    Ok("HI")
+  }
+
   def process(id: String) = Action {
     val fetchFuture: Future[JsValue] = ws.url(s"http://localhost:8000/fetch/$id").get().map { response =>
       response.json
