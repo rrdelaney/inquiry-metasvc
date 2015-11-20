@@ -38,7 +38,8 @@ class VideoDAO extends GenericDAO with VideoComponent {
     val action = sql"""SELECT FLOOR(frame * 24 * $duration::numeric::integer / $frames::numeric::integer) AS frames
                        FROM inq_video_metadata
                        WHERE id = $id
-                       AND image_data LIKE $keywords""".as[Long]
+                       AND image_data LIKE $keywords
+                       OR ocr_data LIKE $keywords""".as[Long]
 
     db.run(action.asTry).map {
       case Success(data: Seq[Long]) => data
