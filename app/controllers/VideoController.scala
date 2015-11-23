@@ -37,14 +37,14 @@ class VideoController @Inject() (corsFilter: CORSFilter, videoDAO: VideoDAO, met
   implicit val timeout = akka.util.Timeout(500000 seconds)
 
   def process(id: String) = Action {
-    val fetchFuture: Future[JsValue] = ws.url(s"http://localhost:8000/fetch/$id").get().map { response =>
-      response.json
-    }
+    val fetchFuture: Future[JsValue] = ws.url(s"http://localhost:8000/fetch/$id").get().map { response => response.json }
     val fetchData = Await.result(fetchFuture, Duration.Inf)
     val frames = (fetchData \ "num_frames").as[Long]
     val total_frames = (fetchData \ "total_frames").as[Long]
     val duration = (fetchData \ "duration").as[Int]
+    val downloaded = (fetchData \ "downloaded_caption").as[Boolean]
 
+    // Insert Video Metadata
     metadataDAO.insert(VideoMetadata(id, total_frames, duration))
 
     // Process Tesseract Data
@@ -66,33 +66,24 @@ class VideoController @Inject() (corsFilter: CORSFilter, videoDAO: VideoDAO, met
 
     val clarifaiProcs = (1 to frames.toInt).map(frame => (clarifaiProcessors ? ClarifaiImage(id, frame.toString, token)).mapTo[Boolean])
 
-    // Parse caption data
-    val captionFuture: Future[JsValue] = ws.url(s"http://localhost:8000/captions/$id").get().map { response =>
-      response.json
-    }
-    val captionData = Await.result(captionFuture, Duration.Inf)
-    val downloaded = (captionData \ "downloaded").as[Boolean]
-
-    downloaded match {
-      case true =>
-        val text = Source.fromFile(s"/var/www/captions/$id.en.srt").mkString
-        val captions: List[Caption] = parseSRT(text)
-        captions.par.map { caption =>
-          videoDAO.updateCaption(id, caption.getFrame(total_frames, duration), caption.content.toLowerCase())
-        }
-      case false => None
+    if (downloaded) {
+      val text = Source.fromFile(s"/var/www/videos/$id.en.srt").mkString
+      val captions: List[Caption] = parseSRT(text)
+      captions.par.map { caption =>
+        videoDAO.updateCaption(id, caption.getFrame(total_frames, duration), caption.content.toLowerCase())
+      }
     }
 
     Await.result(Future.sequence(tessProcs), Duration.Inf)
     Await.result(Future.sequence(clarifaiProcs), Duration.Inf)
-    Ok("Sent Messages Bruh")
+    Ok
   }
 
 
   def exists(id: String) = Action.async {
     videoDAO.exists(id).map{
-      case true => Ok("Video Exists")
-      case false => BadRequest("Video Does Not Exist")
+      case true => Ok
+      case false => BadRequest
     }
   }
 
