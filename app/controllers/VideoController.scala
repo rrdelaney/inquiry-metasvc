@@ -53,7 +53,7 @@ class VideoController @Inject() (corsFilter: CORSFilter, videoDAO: VideoDAO, met
     // Process Tesseract Data
     // val tessProcs = (1 to frames.toInt).map(frame => (tesseractProcessors ? ProcessImage(id, frame.toString)).mapTo[Boolean])
     (1 to frames.toInt).par.map { frame =>
-      val text: String = s"tesseract /var/www/frames/$id/$frame.jpg stdout" !!
+      val text: String = s"tesseract /var/www/frames/$id/$frame.png stdout" !!
 
       val result = videoDAO.updateOCRData(id, frame.toLong, text).map { result => result }
     }
@@ -73,7 +73,7 @@ class VideoController @Inject() (corsFilter: CORSFilter, videoDAO: VideoDAO, met
 
     // val clarifaiProcs = (1 to frames.toInt).map(frame => (clarifaiProcessors ? ClarifaiImage(id, frame.toString, token)).mapTo[Boolean])
     (1 to frames.toInt).par.map { frame =>
-      val url = s"https://api.clarifai.com/v1/tag/?url=http://104.236.166.190/frames/$id/$frame.jpg"
+      val url = s"https://api.clarifai.com/v1/tag/?url=http://192.241.191.143/frames/$id/$frame.png"
       val keywordsFuture: Future[Seq[JsValue]] = ws.url(url)
         .withHeaders("Authorization" -> s"Bearer $token")
         .get()
