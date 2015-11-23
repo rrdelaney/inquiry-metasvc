@@ -26,6 +26,7 @@ import scala.util.{Left, Right}
 import scala.io.Source
 
 import util.SRTParser._
+import util.Fetch._
 
 @Singleton
 class VideoController @Inject() (corsFilter: CORSFilter, videoDAO: VideoDAO, metadataDAO: VideoMetadataDAO, system: ActorSystem, ws: WSClient) extends Controller {
@@ -37,8 +38,9 @@ class VideoController @Inject() (corsFilter: CORSFilter, videoDAO: VideoDAO, met
   implicit val timeout = akka.util.Timeout(500000 seconds)
 
   def process(id: String) = Action {
-    val fetchFuture: Future[JsValue] = ws.url(s"http://localhost:8000/fetch/$id").get().map { response => response.json }
-    val fetchData = Await.result(fetchFuture, Duration.Inf)
+    // val fetchFuture: Future[JsValue] = ws.url(s"http://localhost:8000/fetch/$id").get().map { response => response.json }
+    // val fetchData = Await.result(fetchFuture, Duration.Inf)
+    val fetchData = fetch(id)
     val frames = (fetchData \ "num_frames").as[Long]
     val total_frames = (fetchData \ "total_frames").as[Long]
     val duration = (fetchData \ "duration").as[Int]
