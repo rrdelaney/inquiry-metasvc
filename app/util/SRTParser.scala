@@ -1,4 +1,4 @@
-package actors.util
+package util
 
 object SRTParser {
   val captionRegex = """\d+\n(\d{2})\:(\d{2})\:(\d{2})\,(\d{3}) --> (\d{2})\:(\d{2})\:(\d{2})\,(\d{3})\n([\s\S]*?)\n{2}""".r

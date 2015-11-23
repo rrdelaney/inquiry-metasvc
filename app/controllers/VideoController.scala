@@ -25,7 +25,7 @@ import scala.util.{Left, Right}
 
 import scala.io.Source
 
-import actors.util.SRTParser._
+import util.SRTParser._
 
 @Singleton
 class VideoController @Inject() (corsFilter: CORSFilter, videoDAO: VideoDAO, metadataDAO: VideoMetadataDAO, system: ActorSystem, ws: WSClient) extends Controller {
