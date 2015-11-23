@@ -35,7 +35,7 @@ class VideoDAO extends GenericDAO with VideoComponent {
     val frames = metadata.frames
     val duration = metadata.duration
     val keywords = s"%$query%"
-    val action = sql"""SELECT FLOOR(frame - 1) AS frames
+    val action = sql"""SELECT FLOOR(frame - 2) AS frames
                        FROM inq_video_metadata
                        WHERE id = $id
                        AND LOWER(image_data) LIKE $keywords
