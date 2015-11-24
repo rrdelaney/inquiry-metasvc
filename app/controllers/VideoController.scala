@@ -38,9 +38,6 @@ class VideoController @Inject() (corsFilter: CORSFilter, videoDAO: VideoDAO, met
   implicit val timeout = akka.util.Timeout(500000 seconds)
 
   def process(id: String) = Action {
-    // val fetchFuture: Future[JsValue] = ws.url(s"http://localhost:8000/fetch/$id").get().map { response => response.json }
-    // val fetchData = Await.result(fetchFuture, Duration.Inf)
-
     val fetchData = fetch(id)
     val frames = (fetchData \ "num_frames").as[Long]
     val total_frames = (fetchData \ "total_frames").as[Long]
@@ -59,9 +56,6 @@ class VideoController @Inject() (corsFilter: CORSFilter, videoDAO: VideoDAO, met
         videoDAO.updateCaption(id, caption.getFrame(total_frames, duration), caption.content.toLowerCase())
       }
     }
-
-    // Process Tesseract Data
-    val tessProcs = (1 to frames.toInt).map(frame => (tesseractProcessors ? ProcessImage(id, frame.toString)).mapTo[Boolean])
 
     // (1 to frames.toInt).par.map { frame =>
     //   val text: String = s"tesseract /var/www/frames/$id/$frame.png stdout" !!
@@ -83,8 +77,11 @@ class VideoController @Inject() (corsFilter: CORSFilter, videoDAO: VideoDAO, met
 
     val token: String = Await.result(tokenFuture, Duration.Inf)
 
-    // val clarifaiProcs = (1 to frames.toInt).map(frame => (clarifaiProcessors ? ClarifaiImage(id, frame.toString, token)).mapTo[Boolean])
+    val clarifaiProcs = (1 to frames.toInt).map(frame => (clarifaiProcessors ? ClarifaiImage(id, frame.toString, token)).mapTo[Boolean])
 
+    // Process Tesseract Data
+    val tessProcs = (1 to frames.toInt).map(frame => (tesseractProcessors ? ProcessImage(id, frame.toString)).mapTo[Boolean])
+    
     // (1 to frames.toInt).par.map { frame =>
     //   val url = s"https://api.clarifai.com/v1/tag/?url=http://192.241.191.143/frames/$id/$frame.png"
     //   val keywordsFuture: Future[Seq[JsValue]] = ws.url(url)
@@ -101,7 +98,7 @@ class VideoController @Inject() (corsFilter: CORSFilter, videoDAO: VideoDAO, met
     // }
 
     Await.result(Future.sequence(tessProcs), Duration.Inf)
-    // Await.result(Future.sequence(clarifaiProcs), Duration.Inf)
+    Await.result(Future.sequence(clarifaiProcs), Duration.Inf)
     Ok
   }
 

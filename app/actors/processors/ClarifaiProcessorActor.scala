@@ -25,8 +25,8 @@ class ClarifaiProcessingActor(ws: WSClient, videoDAO: VideoDAO) extends Actor {
       val keywords = Await.result(keywordsFuture, Duration.Inf)
       val data = keywords(0).as[List[String]] mkString (" ")
 
-      val result = videoDAO.updateImageData(id, frame.toLong, data).map { result =>
-        sender() ! result
-      }
+      val resultResult = videoDAO.updateImageData(id, frame.toLong, data)
+      val result = Await.result(resultFuture, Duration.Inf)
+      sender() ! result
   }
 }
