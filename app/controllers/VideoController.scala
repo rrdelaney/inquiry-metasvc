@@ -50,6 +50,15 @@ class VideoController @Inject() (corsFilter: CORSFilter, videoDAO: VideoDAO, met
     // Insert Video Metadata
     metadataDAO.insert(VideoMetadata(id, total_frames, duration))
 
+    // Process Caption Data
+    if (downloaded) {
+      val text = Source.fromFile(s"/var/www/videos/$id.en.srt").mkString
+      val captions: List[Caption] = parseSRT(text)
+      captions.par.map { caption =>
+        videoDAO.updateCaption(id, caption.getFrame(total_frames, duration), caption.content.toLowerCase())
+      }
+    }
+
     // Process Tesseract Data
     val tessProcs = (1 to frames.toInt).map(frame => (tesseractProcessors ? ProcessImage(id, frame.toString)).mapTo[Boolean])
 
@@ -73,7 +82,7 @@ class VideoController @Inject() (corsFilter: CORSFilter, videoDAO: VideoDAO, met
 
     val token: String = Await.result(tokenFuture, Duration.Inf)
 
-    val clarifaiProcs = (1 to frames.toInt).map(frame => (clarifaiProcessors ? ClarifaiImage(id, frame.toString, token)).mapTo[Boolean])
+    // val clarifaiProcs = (1 to frames.toInt).map(frame => (clarifaiProcessors ? ClarifaiImage(id, frame.toString, token)).mapTo[Boolean])
 
     // (1 to frames.toInt).par.map { frame =>
     //   val url = s"https://api.clarifai.com/v1/tag/?url=http://192.241.191.143/frames/$id/$frame.png"
@@ -90,16 +99,8 @@ class VideoController @Inject() (corsFilter: CORSFilter, videoDAO: VideoDAO, met
     //   val result = videoDAO.updateImageData(id, frame.toLong, data).map { result => result }
     // }
 
-    if (downloaded) {
-      val text = Source.fromFile(s"/var/www/videos/$id.en.srt").mkString
-      val captions: List[Caption] = parseSRT(text)
-      captions.par.map { caption =>
-        videoDAO.updateCaption(id, caption.getFrame(total_frames, duration), caption.content.toLowerCase())
-      }
-    }
-
     Await.result(Future.sequence(tessProcs), Duration.Inf)
-    Await.result(Future.sequence(clarifaiProcs), Duration.Inf)
+    // Await.result(Future.sequence(clarifaiProcs), Duration.Inf)
     Ok
   }
 
