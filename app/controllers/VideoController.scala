@@ -55,6 +55,7 @@ class VideoController @Inject() (corsFilter: CORSFilter, videoDAO: VideoDAO, met
       val text = Source.fromFile(s"/var/www/videos/$id.en.srt").mkString
       val captions: List[Caption] = parseSRT(text)
       captions.par.map { caption =>
+        println("Processing Caption Frame: " + caption.getFrame(total_frames, duration).toString)
         videoDAO.updateCaption(id, caption.getFrame(total_frames, duration), caption.content.toLowerCase())
       }
     }
