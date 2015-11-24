@@ -14,7 +14,7 @@ class ClarifaiProcessingActor(ws: WSClient, videoDAO: VideoDAO) extends Actor {
 
   def receive = {
     case ClarifaiImage(id: String, frame: String, token: String) =>
-      val url = s"https://api.clarifai.com/v1/tag/?url=http://104.236.166.190/frames/$id/$frame.jpg"
+      val url = s"https://api.clarifai.com/v1/tag/?url=http://192.241.191.143/frames/$id/$frame.png"
       val keywordsFuture: Future[Seq[JsValue]] = ws.url(url)
         .withHeaders("Authorization" -> s"Bearer $token")
         .get()

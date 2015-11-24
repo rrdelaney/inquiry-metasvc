@@ -14,7 +14,7 @@ class TesseractProcessingActor(videoDAO: VideoDAO) extends Actor {
 
   def receive = {
     case ProcessImage(id: String, frame: String) =>
-      val text: String = s"tesseract /var/www/frames/$id/$frame.jpg stdout" !!
+      val text: String = s"tesseract /var/www/frames/$id/$frame.png stdout" !!
 
       val result = videoDAO.updateOCRData(id, frame.toLong, text).map { result =>
         sender() ! result

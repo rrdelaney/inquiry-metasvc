@@ -11,11 +11,11 @@ import models.VideoMetadata
 import play.api.http.HttpFilters
 import play.filters.cors.CORSFilter
 
-// import akka.actor._
+import akka.actor._
 import scala.concurrent.duration._
-// import akka.pattern.ask
-// import actors.processors._
-// import actors.ImageProcessingActor._
+import akka.pattern.ask
+import actors.processors._
+import actors.ImageProcessingActor._
 
 import play.api.libs.json.Json
 import play.api.libs.json.JsValue
@@ -33,10 +33,9 @@ import sys.process._
 class VideoController @Inject() (corsFilter: CORSFilter, videoDAO: VideoDAO, metadataDAO: VideoMetadataDAO,/* system: ActorSystem,*/ ws: WSClient) extends Controller {
   def filters = Seq(corsFilter)
 
-  // val tesseractProcessors = system.actorOf(Props(new TesseractProcessingActor(videoDAO)), "tesseract-processor")
-  // val clarifaiProcessors = system.actorOf(Props(new ClarifaiProcessingActor(ws, videoDAO)), "clarifai-processor")
-  //
-  // implicit val timeout = akka.util.Timeout(500000 seconds)
+  val tesseractProcessors = system.actorOf(Props(new TesseractProcessingActor(videoDAO)), "tesseract-processor")
+  val clarifaiProcessors = system.actorOf(Props(new ClarifaiProcessingActor(ws, videoDAO)), "clarifai-processor")
+  implicit val timeout = akka.util.Timeout(500000 seconds)
 
   def process(id: String) = Action {
     // val fetchFuture: Future[JsValue] = ws.url(s"http://localhost:8000/fetch/$id").get().map { response => response.json }
@@ -51,12 +50,12 @@ class VideoController @Inject() (corsFilter: CORSFilter, videoDAO: VideoDAO, met
     metadataDAO.insert(VideoMetadata(id, total_frames, duration))
 
     // Process Tesseract Data
-    // val tessProcs = (1 to frames.toInt).map(frame => (tesseractProcessors ? ProcessImage(id, frame.toString)).mapTo[Boolean])
-    (1 to frames.toInt).par.map { frame =>
-      val text: String = s"tesseract /var/www/frames/$id/$frame.png stdout" !!
-
-      val result = videoDAO.updateOCRData(id, frame.toLong, text).map { result => result }
-    }
+    val tessProcs = (1 to frames.toInt).map(frame => (tesseractProcessors ? ProcessImage(id, frame.toString)).mapTo[Boolean])
+    // (1 to frames.toInt).par.map { frame =>
+    //   val text: String = s"tesseract /var/www/frames/$id/$frame.png stdout" !!
+    //
+    //   val result = videoDAO.updateOCRData(id, frame.toLong, text).map { result => result }
+    // }
     // Get Clarifai OAuth2 Token
     val tokenFuture: Future[String] =
       ws.url("https://api.clarifai.com/v1/token/")
@@ -71,21 +70,21 @@ class VideoController @Inject() (corsFilter: CORSFilter, videoDAO: VideoDAO, met
 
     val token: String = Await.result(tokenFuture, Duration.Inf)
 
-    // val clarifaiProcs = (1 to frames.toInt).map(frame => (clarifaiProcessors ? ClarifaiImage(id, frame.toString, token)).mapTo[Boolean])
-    (1 to frames.toInt).par.map { frame =>
-      val url = s"https://api.clarifai.com/v1/tag/?url=http://192.241.191.143/frames/$id/$frame.png"
-      val keywordsFuture: Future[Seq[JsValue]] = ws.url(url)
-        .withHeaders("Authorization" -> s"Bearer $token")
-        .get()
-        .map { response =>
-          (response.json \\ "classes")
-        }
-
-      val keywords = Await.result(keywordsFuture, Duration.Inf)
-      val data = keywords(0).as[List[String]] mkString (" ")
-
-      val result = videoDAO.updateImageData(id, frame.toLong, data).map { result => result }
-    }
+    val clarifaiProcs = (1 to frames.toInt).map(frame => (clarifaiProcessors ? ClarifaiImage(id, frame.toString, token)).mapTo[Boolean])
+    // (1 to frames.toInt).par.map { frame =>
+    //   val url = s"https://api.clarifai.com/v1/tag/?url=http://192.241.191.143/frames/$id/$frame.png"
+    //   val keywordsFuture: Future[Seq[JsValue]] = ws.url(url)
+    //     .withHeaders("Authorization" -> s"Bearer $token")
+    //     .get()
+    //     .map { response =>
+    //       (response.json \\ "classes")
+    //     }
+    //
+    //   val keywords = Await.result(keywordsFuture, Duration.Inf)
+    //   val data = keywords(0).as[List[String]] mkString (" ")
+    //
+    //   val result = videoDAO.updateImageData(id, frame.toLong, data).map { result => result }
+    // }
 
     if (downloaded) {
       val text = Source.fromFile(s"/var/www/videos/$id.en.srt").mkString
