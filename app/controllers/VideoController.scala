@@ -30,7 +30,7 @@ import util.Fetch._
 import sys.process._
 
 @Singleton
-class VideoController @Inject() (corsFilter: CORSFilter, videoDAO: VideoDAO, metadataDAO: VideoMetadataDAO,/* system: ActorSystem,*/ ws: WSClient) extends Controller {
+class VideoController @Inject() (corsFilter: CORSFilter, videoDAO: VideoDAO, metadataDAO: VideoMetadataDAO, system: ActorSystem, ws: WSClient) extends Controller {
   def filters = Seq(corsFilter)
 
   val tesseractProcessors = system.actorOf(Props(new TesseractProcessingActor(videoDAO)), "tesseract-processor")
