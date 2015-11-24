@@ -27,12 +27,15 @@ object Fetch {
       }
    }
 
-   def extractFrames(video_id : String, extension: String): Float = {
+   def getDuration(video_id: String, extension: String): Float = {
+     val duration = s"ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 /var/www/videos/$video_id.$extension" !!
+
+     duration.toFloat
+   }
+
+   def extractFrames(video_id : String, extension: String) {
       s"mkdir /var/www/frames/$video_id" !
       val frames = s"ffmpeg -i /var/www/videos/$video_id.$extension -r 1 /var/www/frames/$video_id/%d.png" !!
-      val duration = s"ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 /var/www/videos/$video_id.$extension" !!
-
-      duration.toFloat
    }
 
    def numFrames(video_id: String): Int = {
@@ -57,7 +60,8 @@ object Fetch {
 
    def fetch(video_id : String) = {
       val extension = downloadVideo(video_id)
-      val duration = extractFrames(video_id, extension)
+      val duration = getDuration(video_id, extension)
+      extractFrames(video_id, extension)
       val frames = numFrames(video_id)
       val total_frames = totalFrames(video_id, duration, extension)
       val cap_exists = new java.io.File(s"/var/www/videos/$video_id.en.srt").exists
