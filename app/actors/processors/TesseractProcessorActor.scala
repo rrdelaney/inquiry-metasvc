@@ -18,6 +18,7 @@ class TesseractProcessingActor(videoDAO: VideoDAO) extends Actor {
       val text: String = s"tesseract /var/www/frames/$id/$frame.png stdout" !!
 
       val result = videoDAO.updateOCRData(id, frame.toLong, text).map { result =>
+        println(s"Finished Frame OCR Data : $frame" )
         sender() ! result
       }
   }
