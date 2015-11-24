@@ -7,6 +7,8 @@ import dao._
 import play.api.libs.concurrent.Execution.Implicits.defaultContext
 import scala.concurrent.{Future, Await}
 
+import play.api.Logger
+
 import java.io.{PipedInputStream, PipedOutputStream}
 import play.api.libs.iteratee.Enumerator
 
@@ -52,7 +54,7 @@ class VideoController @Inject() (corsFilter: CORSFilter, videoDAO: VideoDAO, met
       val downloaded = (fetchData \ "downloaded_caption").as[Boolean]
 
       // Publish the overall length of the video that needs to be processed
-      progressProducer.write(frames.toInt)
+      progressProducer.write(frames.toInt * 2)
       progressProducer.flush()
 
       // Insert Video Metadata
@@ -68,33 +70,32 @@ class VideoController @Inject() (corsFilter: CORSFilter, videoDAO: VideoDAO, met
       }
 
       // Get Clarifai OAuth2 Token
-      // val tokenFuture: Future[String] =
-      //   ws.url("https://api.clarifai.com/v1/token/")
-      //     .post(Map(
-      //       "grant_type" -> Seq("client_credentials"),
-      //       "client_id" -> Seq("vxgYA0F1qWmZQktMmKMhppqIQss4zMYDmxQX3kbD"),
-      //       "client_secret" -> Seq("ipFs34CvymKN8sXYHH3Rph1G7QIELIXwhFR4b8eq")
-      //     ))
-      //     .map { response =>
-      //       (response.json \ "access_token").as[String]
-      //     }
-      //
-      // // val token: String = Await.result(tokenFuture, Duration.Inf)
-      // tokenFuture.map { token =>
-      //   val clarifaiProcs = (1 to frames.toInt).map(frame => (clarifaiProcessors ? ClarifaiImage(id, frame.toString, token)).mapTo[Boolean])
-      // }
+      val tokenFuture: Future[String] =
+        ws.url("https://api.clarifai.com/v1/token/")
+          .post(Map(
+            "grant_type" -> Seq("client_credentials"),
+            "client_id" -> Seq("vxgYA0F1qWmZQktMmKMhppqIQss4zMYDmxQX3kbD"),
+            "client_secret" -> Seq("ipFs34CvymKN8sXYHH3Rph1G7QIELIXwhFR4b8eq")
+          ))
+          .map { response =>
+            (response.json \ "access_token").as[String]
+          }
+
+      val token: String = Await.result(tokenFuture, Duration.Inf)
+
+      val clarifaiProcs = (1 to frames.toInt).map(frame => (clarifaiProcessors ? ClarifaiImage(id, frame.toString, token, progressProducer)).mapTo[Boolean])
 
       // Process Tesseract Data
       val tessProcs = (1 to frames.toInt).map(frame => (tesseractProcessors ? ProcessImage(id, frame.toString, progressProducer)).mapTo[Boolean])
 
       Await.result(Future.sequence(tessProcs), Duration.Inf)
+      Await.result(Future.sequence(clarifaiProcs), Duration.Inf)
 
       progressProducer.close()
-      // Await.result(Future.sequence(clarifaiProcs), Duration.Inf)
     } onComplete {
-      case Success(_) => println("Finished Processing")
+      case Success(_) => Logger.debug(s"Finished Processing $id")
       case Failure(err) =>
-        println("Failure: " + err)
+        Logger.debug("Failure: " + err)
         progressProducer.close()
         progressConsumer.close()
     }
