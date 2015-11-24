@@ -29,8 +29,8 @@ class ClarifaiProcessingActor(ws: WSClient, videoDAO: VideoDAO) extends Actor {
 
       val resultFuture = videoDAO.updateImageData(id, frame.toLong, data)
       val result = Await.result(resultFuture, Duration.Inf)
-      outputStream.write(1)
-      outputStream.flush()
+      progress.write(1)
+      progress.flush()
       sender() ! result
   }
 }

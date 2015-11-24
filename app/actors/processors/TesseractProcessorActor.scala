@@ -16,13 +16,13 @@ class TesseractProcessingActor(videoDAO: VideoDAO) extends Actor {
   import actors.ImageProcessingActor._
 
   def receive = {
-    case ProcessImage(id: String, frame: String, outputStream: PipedOutputStream) =>
+    case ProcessImage(id: String, frame: String, progress: PipedOutputStream) =>
       val text: String = s"tesseract /var/www/frames/$id/$frame.png stdout" !!
 
       val resultFuture = videoDAO.updateOCRData(id, frame.toLong, text)
       val result = Await.result(resultFuture, Duration.Inf)
-      outputStream.write(1)
-      outputStream.flush()
+      progress.write(1)
+      progress.flush()
       sender() ! result
   }
 }
