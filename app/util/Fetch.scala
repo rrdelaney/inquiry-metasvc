@@ -35,7 +35,7 @@ object Fetch {
 
    def extractFrames(video_id : String, extension: String) {
       s"mkdir /var/www/frames/$video_id" !
-      val frames = s"ffmpeg -i /var/www/videos/$video_id.$extension -r 1 /var/www/frames/$video_id/%d.png" !!
+      val frames = s"ffmpeg -i /var/www/videos/$video_id.$extension -r 2 /var/www/frames/$video_id/%d.png" !!
    }
 
    def numFrames(video_id: String): Int = {

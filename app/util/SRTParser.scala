@@ -11,7 +11,7 @@ object SRTParser {
   ) {
       val startTime = (3600 * startHour) + (60 * startMinute) + startSecond
 
-      def getFrame(frames: Long, duration: Int) = startTime.toInt + 2// * frames / (24 * duration)
+      def getFrame(frames: Long, duration: Int) = (2*startTime.toInt) + 4// * frames / (24 * duration)
   }
 
   def parseSRT(input: String) =
