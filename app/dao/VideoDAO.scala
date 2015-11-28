@@ -48,11 +48,6 @@ class VideoDAO extends GenericDAO with VideoComponent {
     }
   }
 
-  def exists(id: String): Future[Boolean] = {
-    val action = videos.filter(_.id === id).length
-    db.run(action.result).map { result => result > 0 }
-  }
-
   def updateCaption(id: String, frame: Long, caption: String): Future[Boolean] =  {
     val action = (
         for {
