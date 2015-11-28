@@ -41,6 +41,11 @@ class VideoMetadataDAO extends GenericDAO with VideoMetadataComponent {
     }
   }
 
+  def exists(id: String): Future[Boolean] = {
+    val action = videos.filter(_.id === id).length
+    db.run(action.result).map { result => result > 0 }
+  }
+
   def insert(metadata: VideoMetadata): Future[Boolean] = {
     val action = (videos returning videos.map(_.id)) += metadata
     db.run(action.asTry).map{

@@ -35,7 +35,7 @@ import util.Fetch._
 import sys.process._
 
 @Singleton
-class VideoController @Inject() (corsFilter: CORSFilter, videoDAO: VideoDAO, metadataDAO: VideoMetadataDAO, system: ActorSystem, ws: WSClient) extends Controller {
+class VideoController @Inject() (corsFilter: CORSFilter, videoDAO: VideoDAO, youtubeDAO: VideoMetadataDAO, system: ActorSystem, ws: WSClient) extends Controller {
   def filters = Seq(corsFilter)
 
   val tesseractProcessors = system.actorOf(Props(new TesseractProcessingActor(videoDAO)), "tesseract-processor")
@@ -46,6 +46,8 @@ class VideoController @Inject() (corsFilter: CORSFilter, videoDAO: VideoDAO, met
     val progressProducer = new PipedOutputStream()
     val progressConsumer = new PipedInputStream(progressProducer)
 
+    Logger.info(s"Video $id has begun processing")
+
     Future {
       val fetchData = fetch(id)
       val frames = (fetchData \ "num_frames").as[Long]
@@ -53,12 +55,16 @@ class VideoController @Inject() (corsFilter: CORSFilter, videoDAO: VideoDAO, met
       val duration = (fetchData \ "duration").as[Int]
       val downloaded = (fetchData \ "downloaded_caption").as[Boolean]
 
+      Logger.info(s"Video $id has been fetched and frames generated")
+
       // Publish the overall length of the video that needs to be processed
       progressProducer.write(frames.toInt * 2)
       progressProducer.flush()
 
       // Insert Video Metadata
-      metadataDAO.insert(VideoMetadata(id, total_frames, duration))
+      youtubeDAO.insert(VideoMetadata(id, total_frames, duration))
+
+      Logger.info(s"Beginning processing captions for video $id")
 
       // Process Caption Data
       if (downloaded) {
@@ -68,6 +74,8 @@ class VideoController @Inject() (corsFilter: CORSFilter, videoDAO: VideoDAO, met
           videoDAO.updateCaption(id, caption.getFrame(total_frames, duration), caption.content.toLowerCase())
         }
       }
+
+      Logger.info(s"Beginning processing image data for video $id")
 
       // Get Clarifai OAuth2 Token
       val tokenFuture: Future[String] =
@@ -85,6 +93,8 @@ class VideoController @Inject() (corsFilter: CORSFilter, videoDAO: VideoDAO, met
 
       val clarifaiProcs = (1 to frames.toInt).map(frame => (clarifaiProcessors ? ClarifaiImage(id, frame.toString, token, progressProducer)).mapTo[Boolean])
 
+      Logger.info(s"Beginning processing ocr for video $id")
+
       // Process Tesseract Data
       val tessProcs = (1 to frames.toInt).map(frame => (tesseractProcessors ? ProcessImage(id, frame.toString, progressProducer)).mapTo[Boolean])
 
@@ -93,9 +103,9 @@ class VideoController @Inject() (corsFilter: CORSFilter, videoDAO: VideoDAO, met
 
       progressProducer.close()
     } onComplete {
-      case Success(_) => Logger.debug(s"Finished Processing $id")
+      case Success(_) => Logger.info(s"Video $id has finished processing")
       case Failure(err) =>
-        Logger.debug("Failure: " + err)
+        Logger.error(s"Video $id has failed", err)
         progressProducer.close()
         progressConsumer.close()
     }
@@ -104,14 +114,15 @@ class VideoController @Inject() (corsFilter: CORSFilter, videoDAO: VideoDAO, met
   }
 
   def exists(id: String) = Action.async {
-    videoDAO.exists(id).map{
+    youtubeDAO.exists(id).map{
       case true => Ok
       case false => BadRequest
     }
   }
 
   def query(id: String, query: String) = Action.async {
-    metadataDAO.fetch(id).map {
+    Logger.info(s"Querying video $id with query string: $query")
+    youtubeDAO.fetch(id).map {
       case Left(metadata: VideoMetadata) =>
         val resultFuture = videoDAO.fetch(metadata, query)
         val result = Await.result(resultFuture, Duration.Inf)
