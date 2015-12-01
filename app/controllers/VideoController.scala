@@ -91,12 +91,18 @@ class VideoController @Inject() (corsFilter: CORSFilter, videoDAO: VideoDAO, you
 
       val token: String = Await.result(tokenFuture, Duration.Inf)
 
-      val clarifaiProcs = (1 to frames.toInt).map(frame => (clarifaiProcessors ? ClarifaiImage(id, frame.toString, token, progressProducer)).mapTo[Boolean])
+      val clarifaiProcs = (1 to frames.toInt).map(frame =>
+        Logger.info(s"Classifying frame $frame.toString for video $id")
+        (clarifaiProcessors ? ClarifaiImage(id, frame.toString, token, progressProducer)).mapTo[Boolean]
+      )
 
       Logger.info(s"Beginning processing ocr for video $id")
 
       // Process Tesseract Data
-      val tessProcs = (1 to frames.toInt).map(frame => (tesseractProcessors ? ProcessImage(id, frame.toString, progressProducer)).mapTo[Boolean])
+      val tessProcs = (1 to frames.toInt).map(frame =>
+        Logger.info(s"Running OCR on frame $frame.toString for video $id")
+        (tesseractProcessors ? ProcessImage(id, frame.toString, progressProducer)).mapTo[Boolean]
+      )
 
       Await.result(Future.sequence(tessProcs), Duration.Inf)
       Await.result(Future.sequence(clarifaiProcs), Duration.Inf)
@@ -114,6 +120,7 @@ class VideoController @Inject() (corsFilter: CORSFilter, videoDAO: VideoDAO, you
   }
 
   def exists(id: String) = Action.async {
+    Logger.info(s"Checking for video $id metadata")
     youtubeDAO.exists(id).map{
       case true => Ok
       case false => BadRequest
